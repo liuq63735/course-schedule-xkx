@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}登录 - 校科协智能课表管理{% endblock %}
+{% block content %}
+<div class="row justify-content-center mt-4">
+  <div class="col-md-5 col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white text-center">
+        <h5 class="mb-0"><i class="bi bi-calendar3-week"></i> 校科协智能课表管理</h5>
+      </div>
+      <div class="card-body p-4">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">学号</label>
+            <input class="form-control" type="text" name="student_id" required autofocus placeholder="请输入学号">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">密码</label>
+            <input class="form-control" type="password" name="password" required placeholder="请输入密码">
+          </div>
+          <button class="btn btn-primary w-100" type="submit">登 录</button>
+        </form>
+        <div class="mt-3 text-center">
+          <span class="text-muted">还没有账号？</span>
+          <a href="{{ url_for('register') }}">立即注册</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

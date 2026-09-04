@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}编辑学期 - 校科协智能课表管理{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-4 col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-pencil"></i> 编辑学期</h6>
+        <a class="btn btn-sm btn-outline-light" href="{{ url_for('admin_semesters') }}"><i class="bi bi-arrow-left"></i> 返回</a>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">学期名称</label>
+            <input class="form-control" name="name" value="{{ semester.name }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">开始日期</label>
+            <input class="form-control" type="date" name="start_date" value="{{ semester.start_date }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">总周数</label>
+            <input class="form-control" type="number" name="total_weeks" value="{{ semester.total_weeks }}" min="1" max="30" required>
+          </div>
+          <div class="alert alert-warning small py-2 mb-3">
+            <i class="bi bi-exclamation-triangle"></i>
+            修改总周数 / 开始日期会影响“当前周”计算，超出总周数的课程周次将被忽略。
+          </div>
+          <button class="btn btn-primary" type="submit">保存</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
