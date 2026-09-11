@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}课表总览 - 校科协智能课表管理{% endblock %}
+
+{% macro su(sem, w, u) -%}
+  {{ url_for('schedule',
+     semester_id=(sem if sem is not none else (semester.id if semester else none)),
+     week=(w if w is not none else week),
+    user=(u if u is not none else target.id),
+    member_search=member_search) }}
+{%- endmacro %}
+
+{% block content %}
+<span id="scheduleDateMarker" data-date="{{ today_marker }}" hidden></span>
+
+<!-- ===================== 顶部工具栏：学期/周/人员 ===================== -->
+<div class="card shadow-sm mb-3 d-print-none">
+  <div class="card-body py-3">
+    <form method="get" action="{{ url_for('schedule') }}" id="scheduleFilterForm" class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label small mb-1 text-muted">学期</label>
+        <select class="form-select form-select-sm" name="semester_id" id="semesterSelect">
+          {% for s in semesters %}
+          <option value="{{ s.id }}" {% if semester and s.id == semester.id %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label small mb-1 text-muted">教学周</label>
+        <div class="input-group input-group-sm">
+          <a class="btn btn-outline-secondary {{ 'disabled' if week <= 1 }}"
+             href="{{ su(semester.id if semester else none, week-1, none) }}">«</a>
+          <input type="number" class="form-control text-center" style="width:86px" name="week" id="weekInput"
+                 value="{{ week }}" min="1" max="{{ total_weeks or 1 }}">
+          <a class="btn btn-outline-secondary {{ 'disabled' if week >= total_weeks }}"
+             href="{{ su(semester.id if semester else none, week+1, none) }}">»</a>
+        </div>
+      </div>
+      <div class="col-auto">
+        <label class="form-label small mb-1 text-muted">部门</label>
+        <select class="form-select form-select-sm" id="deptFilter">
+          <option value="all">全部部门</option>
+          {% for d in departments %}
+          <option value="{{ d }}">{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-1 text-muted">搜索成员</label>
+        <input class="form-control form-control-sm" type="search" name="member_search"
+               value="{{ member_search }}" placeholder="姓名、学号或专业">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-1 text-muted">成员</label>
+        <select class="form-select form-select-sm" name="user" id="memberSelect">
+          {% for m in members %}
+          <option value="{{ m.id }}" data-dept="{{ m.department or '' }}"
+                  {% if m.id == target.id %}selected{% endif %}>{{ m.name }}{% if m.major %} · {{ m.major }}{% endif %}（{{ m.student_id }}）</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-search"></i> 查看</button>
+        <a class="btn btn-sm btn-outline-primary" href="{{ su(semester.id if semester else none, current_week_no, target.id) }}"
+           title="回到系统日期计算的当前周"><i class="bi bi-geo-alt"></i> 当前周</a>
+        <a class="btn btn-sm btn-outline-secondary" href="javascript:window.print()"><i class="bi bi-printer"></i> 打印</a>
+      </div>
+    </form>
+    {% if semester %}
+    <div class="mt-2 small text-muted d-print-none">
+      <i class="bi bi-calendar-week"></i> 第 <strong>{{ week }}</strong> 周
+      {% if week_start %}（{{ week_start.strftime('%m-%d') }} ~ {{ week_end.strftime('%m-%d') }}）{% endif %}
+      {% if week == current_week_no %}<span class="badge text-bg-success">本周</span>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ===================== 成员信息条 ===================== -->
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+  <h4 class="mb-0"><i class="bi bi-person-badge"></i>
+    <span style="color:{{ target_color }}">{{ target.name }}</span>
+  {% if target.role == 'admin' %}<span class="badge text-bg-warning align-middle">管理员</span>{% endif %}
+    <span class="badge text-bg-light border align-middle">
+      {{ target.identity }}
+      {% if target.identity == '主席' %} <i class="bi bi-star-fill text-warning"></i>
+      {% elif target.department %} · {{ target.department }}
+      {% endif %}
+    </span>
+    <span class="badge text-bg-light border align-middle">{{ target.cohort }}届</span>
+    {% if target.major %}<span class="badge text-bg-light border align-middle">{{ target.major }}</span>{% endif %}
+    <span class="text-muted fs-6 fw-normal">（学号 {{ target.student_id }}）</span>
+  </h4>
+  <div class="ms-auto d-print-none">
+    {% if manageable and semester %}
+      <a class="btn btn-success btn-sm" href="{{ url_for('course_new', semester_id=semester.id, week=week, user=target.id) }}">
+        <i class="bi bi-plus-lg"></i> 添加课程 / 周末安排
+      </a>
+    {% elif manageable and not semester %}
+      <span class="text-muted small">需先由管理员创建学期，方可录入课程</span>
+    {% endif %}
+    {% if target.id != me.id %}
+      <a class="btn btn-outline-primary btn-sm" href="{{ su(semester.id if semester else none, week, me.id) }}"><i class="bi bi-house"></i> 我的课表</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if target.id != me.id %}
+<div class="alert alert-secondary py-2 small d-print-none"><i class="bi bi-eye"></i>
+  你正在查看 <strong>{{ target.name }}</strong>（{{ target.department or '主席' }} / {{ target.cohort }}届）的课表{% if not manageable %}（只读）{% endif %}。
+</div>
+{% endif %}
+
+<!-- ===================== 周一~周日 12 节矩阵课表 ===================== -->
+{% if not semester %}
+  <div class="alert alert-warning shadow-sm">
+    <i class="bi bi-exclamation-triangle"></i> 尚未创建学期，请 <a href="{{ url_for('admin_semesters') }}" class="alert-link">管理员前往学期管理</a> 创建并激活学期。
+  </div>
+
+{% else %}
+<div class="card shadow-sm mb-3">
+  <div class="card-header bg-white py-2">
+    <strong><i class="bi bi-calendar2-week"></i> 周一 ~ 周日</strong>
+    <span class="text-muted small ms-2">周一~周五按节次 · 周六/周日：上午=1-4 · 中午=5-8 · 晚上=9-12</span>
+  </div>
+  <div class="card-body p-2 overflow-auto">
+    {% set has_any = grid_layout[1] or grid_layout[2] or grid_layout[3] or grid_layout[4] or grid_layout[5]
+                     or grid_layout[6] or grid_layout[7] %}
+    {% if not has_any %}
+      <div class="text-center text-muted py-4">
+        <i class="bi bi-inbox" style="font-size:2rem"></i>
+        <p class="mb-0 mt-2">本周（第{{ week }}周）没有任何课程 / 安排记录</p>
+      </div>
+    {% else %}
+    <div class="tt-grid">
+      <div class="tt-head time-head">时间</div>
+      {% for d in range(1, 8) %}
+      <div class="tt-head day-head {{ 'today' if today_col == d else '' }}">{{ WEEK_NAMES[d] }}
+        {% if today_col == d %}<span class="badge text-bg-danger rounded-pill ms-1">今</span>{% endif %}
+        {% if manageable and semester %}
+          <a class="tt-add d-print-none" href="{{ url_for('course_new', semester_id=semester.id, week=week, user=target.id, day=d) }}"
+             title="在{{ WEEK_NAMES[d] }}添加">＋</a>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      <div class="tt-axis" style="height:{{ 12*row_h }}px">
+        {% for sec, label in [('morning','上午'),('afternoon','下午'),('evening','晚上')] %}
+          {% set lo = {'morning':1,'afternoon':5,'evening':9}[sec] %}
+          {% set hi = {'morning':4,'afternoon':8,'evening':12}[sec] %}
+          <div class="axis-sec sec-{{ sec }}">
+            {% for p in range(lo, hi+1) %}
+            <div class="axis-cell">
+              <span class="ax-no">{{ p }}</span>
+              <span class="ax-time">{{ period_times[p][0] }}<br>{{ period_times[p][1] }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </div>
+
+      {% for d in range(1, 8) %}
+      <div class="tt-col {{ 'today' if today_col == d else '' }} {{ 'is-weekend' if d >= 6 else '' }}"
+           style="height:{{ 12*row_h }}px">
+        {% for cell in grid_layout[d] %}
+          {% set r = cell.item %}
+          {% if r.weekend_slot %}
+            {% set sub = WEEKEND_SLOTS[r.weekend_slot] %}
+          {% else %}
+            {% set sub = '第%d-%d节'|format(r.start_period, r.end_period) if r.start_period != r.end_period else '第%d节'|format(r.start_period) %}
+          {% endif %}
+          <div class="tt-item {{ 'tt-item-weekend' if r.weekend_slot else '' }}"
+               style="top:{{ cell.top }}px;height:{{ cell.height }}px;left:{{ cell.left }}%;width:{{ cell.width }}%;
+                      {{ course_style(r) }}"
+               title="{{ r.name }} · {{ sub }} · {{ week_text(r.start_week, r.end_week, r.week_type) }}">
+            <div class="ti-body">
+              <div class="ti-name">{{ r.name }}</div>
+              <div class="ti-sub">{{ sub }}</div>
+            </div>
+            {% if manageable %}
+            <div class="ti-actions d-print-none">
+              <a class="ti-btn" title="编辑"
+                 href="{{ url_for('course_edit', cid=r.id, week=week, semester_id=semester.id, user=target.id) }}"><i class="bi bi-pencil"></i></a>
+              <form class="d-inline" method="post"
+                    action="{{ url_for('course_delete', cid=r.id, semester_id=semester.id, week=week, user=target.id) }}"
+                    onsubmit="return confirm('确定删除「{{ r.name }}」吗？');">
+                <button class="ti-btn text-danger" type="submit" title="删除"><i class="bi bi-trash"></i></button>
+              </form>
+            </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

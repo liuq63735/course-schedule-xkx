@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}{{ '编辑' if course else '添加' }}课程/事项 - 校科协智能课表管理{% endblock %}
+{% block content %}
+
+{% set is_edit = course is not none %}
+{% set next_url = url_for('schedule', semester_id=(semester.id if semester else none), week=week, user=target.id) %}
+{% set form_action = (url_for('course_edit', cid=course.id, user=target.id) if is_edit else url_for('course_new', user=target.id)) %}
+
+<div class="row justify-content-center">
+  <div class="col-lg-7 col-md-9">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+          {% if is_edit %}<i class="bi bi-pencil-square"></i> 编辑内容
+          {% else %}<i class="bi bi-plus-square"></i> 添加内容{% endif %}
+        </h5>
+        <a class="btn btn-sm btn-outline-light" href="{{ next_url }}"><i class="bi bi-arrow-left"></i> 返回课表</a>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-light border small py-2">
+          <i class="bi bi-person-fill"></i> 目标：<strong>{{ target.name }}</strong>
+          （{{ target.identity }} · {% if target.department %}{{ target.department }}{% else %}主席{% endif %} · {{ target.cohort }}届）
+          {% if semester %}· 「{{ semester.name }}」{% endif %}
+        </div>
+
+        <form method="post" action="{{ form_action }}" id="itemForm">
+          <input type="hidden" name="next" value="{{ next_url }}">
+          <input type="hidden" name="user" value="{{ target.id }}">
+
+          {% if not is_edit %}
+          <div class="mb-3">
+            <label class="form-label">学期 <span class="text-danger">*</span></label>
+            <select class="form-select" name="semester_id" required>
+              {% for s in semesters %}
+              <option value="{{ s.id }}" {% if semester and s.id == semester.id %}selected{% endif %}>
+                {{ s.name }}{% if s.is_active %}（当前学期）{% endif %} · 共{{ s.total_weeks }}周
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label class="form-label" id="nameLabel">课程名称 <span class="text-danger">*</span></label>
+            <input class="form-control" type="text" id="nameInput" name="name" required
+                   value="{{ course.name if course }}"
+                   placeholder="例如：高等数学 / 部门例会 / 志愿活动">
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">星期 <span class="text-danger">*</span></label>
+              <select class="form-select" id="daySelect" name="day">
+                {% for d in range(1, 8) %}
+                <option value="{{ d }}" {% if course and course.day == d %}selected{% elif not course and day_default == d %}selected{% endif %}>
+                  {{ WEEK_NAMES[d] }}{% if d >= 6 %}（自定义时段）{% endif %}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- 周一~周五：节次 -->
+            <div class="col-md-8" id="periodRow" {% if course and course.day >= 6 %}style="display:none"{% endif %}>
+              <div class="row g-2">
+                <div class="col-6">
+                  <label class="form-label">开始节次</label>
+                  <select class="form-select" id="startPeriod" name="start_period">
+                    <option value="">— 请选择 —</option>
+                    {% for sec in [('上午', 1, 4), ('下午', 5, 8), ('晚上', 9, 12)] %}
+                    <optgroup label="{{ sec[0] }}">
+                      {% for p in range(sec[1], sec[2] + 1) %}
+                      <option value="{{ p }}" {% if course and course.start_period == p %}selected{% endif %}>
+                        第{{ p }}节 {{ PERIOD_TIMES[p][0] }}-{{ PERIOD_TIMES[p][1] }}
+                      </option>
+                      {% endfor %}
+                    </optgroup>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label">结束节次</label>
+                  <select class="form-select" id="endPeriod" name="end_period">
+                    <option value="">— 请选择 —</option>
+                    {% for sec in [('上午', 1, 4), ('下午', 5, 8), ('晚上', 9, 12)] %}
+                    <optgroup label="{{ sec[0] }}">
+                      {% for p in range(sec[1], sec[2] + 1) %}
+                      <option value="{{ p }}" {% if course and course.end_period == p %}selected{% endif %}>
+                        第{{ p }}节 {{ PERIOD_TIMES[p][0] }}-{{ PERIOD_TIMES[p][1] }}
+                      </option>
+                      {% endfor %}
+                    </optgroup>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- 周六/周日：时段 -->
+            <div class="col-md-8" id="slotRow" {% if course and course.day < 6 %}style="display:none"{% endif %}>
+              <label class="form-label">时段（上午 / 中午 / 晚上）</label>
+              <div class="btn-group w-100" role="group">
+                {% for skey, sname in WEEKEND_SLOTS.items() %}
+                <input type="radio" class="btn-check" name="weekend_slot" id="slot-{{ skey }}" value="{{ skey }}"
+                       {% if course and course.weekend_slot == skey %}checked{% elif not course and slot_default == skey %}checked{% endif %}>
+                <label class="btn btn-outline-primary" for="slot-{{ skey }}">{{ sname }}</label>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+
+          <hr>
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">起始周</label>
+              <input class="form-control" type="number" name="start_week" id="startWeek" min="1"
+                     max="{{ semester.total_weeks if semester else 30 }}" value="{{ course.start_week if course else 1 }}" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">结束周</label>
+              <input class="form-control" type="number" name="end_week" id="endWeek" min="1"
+                     max="{{ semester.total_weeks if semester else 30 }}"
+                     value="{{ course.end_week if course else (semester.total_weeks if semester else 30) }}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">周次类型</label>
+              <select class="form-select" name="week_type">
+                {% for tkey, tname in WEEK_TYPES.items() %}
+                <option value="{{ tkey }}" {% if course and course.week_type == tkey %}selected{% elif not course and tkey == 'all' %}selected{% endif %}>
+                  {{ tname }}
+                </option>
+                {% endfor %}
+              </select>
+              <div class="form-text">单周=仅奇数周，双周=仅偶数周，全周=每周都上。</div>
+            </div>
+          </div>
+
+          <div class="mt-4 d-flex gap-2">
+            <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> 保存</button>
+            <a class="btn btn-outline-secondary" href="{{ next_url }}">取消</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const daySel = document.getElementById('daySelect');
+  const periodRow = document.getElementById('periodRow');
+  const slotRow = document.getElementById('slotRow');
+  const startPeriod = document.getElementById('startPeriod');
+  const endPeriod = document.getElementById('endPeriod');
+  const nameInput = document.getElementById('nameInput');
+  const nameLabel = document.getElementById('nameLabel');
+  const startWeek = document.getElementById('startWeek');
+  const endWeek = document.getElementById('endWeek');
+  function refreshPeriodOptions() {
+    // 结束节次最小值 = 开始节次
+    const s = parseInt(startPeriod.value, 10);
+    [...endPeriod.options].forEach(function (opt) {
+      if (!opt.value) return;
+      const v = parseInt(opt.value, 10);
+      opt.disabled = !isNaN(s) && v < s;
+    });
+    if (endPeriod.value && parseInt(endPeriod.value, 10) < s) endPeriod.value = s ? s : '';
+  }
+
+  function toggleMode() {
+    const dayVal = parseInt(daySel.value, 10);
+    const weekend = dayVal >= 6;
+    periodRow.style.display = weekend ? 'none' : '';
+    slotRow.style.display = weekend ? '' : 'none';
+    if (weekend) {
+      nameLabel.textContent = '要做的事情 / 活动内容 *';
+      nameInput.placeholder = '例如：去图书馆自习 / 社团外出拉赞助';
+    } else {
+      nameLabel.textContent = '课程名称 *';
+      nameInput.placeholder = '例如：高等数学 / 部门例会 / 志愿活动';
+    }
+    if (weekend) {
+      startPeriod.required = false;
+      endPeriod.required = false;
+      document.querySelectorAll('input[name="weekend_slot"]').forEach(r => r.required = true);
+    } else {
+      startPeriod.required = true;
+      endPeriod.required = true;
+      document.querySelectorAll('input[name="weekend_slot"]').forEach(r => r.required = false);
+    }
+  }
+
+  daySel.addEventListener('change', function () {
+    toggleMode();
+    refreshPeriodOptions();
+  });
+  startPeriod.addEventListener('change', refreshPeriodOptions);
+  endPeriod.addEventListener('change', refreshPeriodOptions);
+  startWeek.addEventListener('change', function () {
+    if (parseInt(startWeek.value) > parseInt(endWeek.value)) endWeek.value = startWeek.value;
+  });
+  endWeek.addEventListener('change', function () {
+    if (parseInt(startWeek.value) > parseInt(endWeek.value)) startWeek.value = endWeek.value;
+  });
+  toggleMode();
+  refreshPeriodOptions();
+})();
+</script>
+{% endblock %}
